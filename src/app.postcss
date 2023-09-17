@@ -1,0 +1,19 @@
+/* Write your global styles here, in PostCSS syntax */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body {
+	@apply h-full overflow-hidden;
+}
+
+:root {
+	/* =~= Skeleton Theme Properties =~= */
+	--theme-font-family-base: Verdana, Arial, sans-serif;
+	--theme-font-family-heading: Roboto, Arial, sans-serif;
+}
+
+.codejar-wrap .codejar-linenumbers {
+	top: 0.5em !important;
+}
