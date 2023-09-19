@@ -2,46 +2,49 @@
 	import Prism from 'prismjs';
 	import 'prismjs/components/prism-python';
 	import 'prismjs/themes/prism-okaidia.css';
+
 	import { onMount, tick } from 'svelte';
 	import type { ComponentType } from 'svelte';
-	import type { Pyodide, PyProxy } from '$lib/pyodide';
 
-	const scaleFactor = window.devicePixelRatio;
+	import type { PyBuffer, Pyodide, PyProxy } from '$lib/pyodide';
 
 	const pyHeader = `# JS-Python proxy code
 def display(img):
 	"""Send into canvas"""
 	import numpy as np
-	from js import document, window, ImageData
-	from pyodide.ffi import create_proxy
+	from cvlab import display_raw_image
 	if img.dtype == np.float64:
 		img = ((img + 1) * 127.5).astype(np.uint8)
 	assert img.dtype == np.uint8
 	h, w, depth = img.shape
-	if depth == 3:
+	if depth in (1, 3):
 		mask = np.ones((h, w, 1), dtype=np.uint8)
 		mask.fill(255)
-		img = np.dstack((img, mask))
-	pix_proxy = create_proxy(np.ravel(img).tobytes())
-	pix_buffer = pix_proxy.getBuffer("u8clamped")
-	data = ImageData.new(pix_buffer.data, w, h)
-	canvas = document.getElementById("MainCanvas")
-	scaleFactor = window.devicePixelRatio
-	canvas.width = w
-	canvas.height = h
-	canvas.style.width = f"{w / scaleFactor}px"
-	canvas.style.height = f"{h / scaleFactor}px"
-	ctx = canvas.getContext("2d")
-	ctx.putImageData(data, 0, 0)
-	pix_buffer.release()
-	pix_proxy.destroy()
+		if depth == 1:
+			img = np.dstack((img, img, img, mask))
+		elif depth == 3:
+			img = np.dstack((img[...,::-1], mask))
+	display_raw_image(np.ravel(img).tobytes(), w, h)
+
+async def imread_picsum(size:int, flags:int=1):
+	import cv2
+	import numpy as np
+	from pyodide.http import pyfetch
+	print("Download picsum image..")
+	res = await pyfetch(f"https://picsum.photos/{size}")
+	buf = bytearray(await res.bytes())
+	arr = np.asarray(buf, dtype=np.uint8)
+	return cv2.imdecode(arr, flags)
 
 # Your code here
 `;
 	let code = `import cv2
 import numpy as np
 
-img = np.random.randint(256, size=(256, 256, 3), dtype=np.uint8)
+# Get example image from Lorem Picsum
+img = await imread_picsum(256)
+
+# Your image-effect
 img = cv2.medianBlur(img, 5)
 print(f"first pixel: {img[0, 0]}")
 display(img)`;
@@ -97,8 +100,14 @@ display(img)`;
 		ns.destroy();
 	};
 
+	let mainCanvas: HTMLCanvasElement;
+	let scaleFactor = 1;
+	let canvasWidth: number = 256;
+	let canvasHeight: number = 256;
 	let canExecute = false;
 	onMount(async () => {
+		scaleFactor = window.devicePixelRatio;
+
 		CodeJar = (await import('@novacbn/svelte-codejar')).CodeJar;
 		pyLog[0][1] += 'OK';
 
@@ -106,6 +115,21 @@ display(img)`;
 		pyodide = await window.loadPyodide({
 			stdout: (msg) => pushPyLog(1, msg),
 			stderr: (msg) => pushPyLog(2, msg)
+		});
+		pyodide.registerJsModule('cvlab', {
+			display_raw_image: (bytes: PyBuffer, width: number, height: number) => {
+				const buffer = bytes.getBuffer('u8clamped');
+				bytes.destroy();
+				try {
+					const data = new ImageData(buffer.data as Uint8ClampedArray, width, height);
+					const ctx = mainCanvas.getContext('2d');
+					if (!ctx) throw new Error('Failed to create canvas context.');
+					ctx.putImageData(data, 0, 0);
+					scaleFactor = window.devicePixelRatio;
+				} finally {
+					buffer.release();
+				}
+			}
 		});
 		pyLog[pyLog.length - 1][1] += 'OK';
 
@@ -184,7 +208,7 @@ display(img)`;
 						<li
 							class="py-1 m-1 border-b-blue-600 border-b-[1px] last:border-b-0 logtype-{type} hover:bg-slate-800 whitespace-normal"
 						>
-							{record}
+							<pre>{record}</pre>
 						</li>
 					{/each}
 				</ul>
@@ -198,11 +222,11 @@ display(img)`;
 			</h1>
 			<div class="min-w-[200px] p-2 variant-outline-primary">
 				<canvas
-					id="MainCanvas"
-					width="256"
-					height="256"
-					class="mx-auto bg-gray-400 outline-1 outline-black"
-					style="width: {256 / scaleFactor}px; height: {256 / scaleFactor}px;"
+					width={canvasWidth}
+					height={canvasHeight}
+					class="mx-auto max-w-[30vw] max-h-[30vw] bg-gray-400 outline-1 outline-black"
+					style="width: {canvasWidth / scaleFactor}px; height: {canvasHeight / scaleFactor}px;"
+					bind:this={mainCanvas}
 				/>
 			</div>
 		</div>
