@@ -26,12 +26,12 @@ def display(img):
 			img = np.dstack((img[...,::-1], mask))
 	display_raw_image(np.ravel(img).tobytes(), w, h)
 
-async def imread_picsum(size:int, flags:int=1):
+async def imread_picsum(path, flags:int=1):
 	import cv2
 	import numpy as np
 	from pyodide.http import pyfetch
 	print("Download picsum image..")
-	res = await pyfetch(f"https://picsum.photos/{size}")
+	res = await pyfetch(f"https://picsum.photos/{path}")
 	buf = bytearray(await res.bytes())
 	arr = np.asarray(buf, dtype=np.uint8)
 	return cv2.imdecode(arr, flags)
@@ -41,8 +41,10 @@ async def imread_picsum(size:int, flags:int=1):
 	let code = `import cv2
 import numpy as np
 
-# Get example image from Lorem Picsum
+# Get a random 256px square image
 img = await imread_picsum(256)
+# Or specified image from picsum.photos
+#img = await imread_picsum("id/20/256/256")
 
 # Your image-effect
 img = cv2.medianBlur(img, 5)
@@ -180,20 +182,19 @@ display(img)`;
 		class="lg:h-full md:h-96 relative grid grid-col-1 lg:grid-rows-[1fr_min-content] lg:grid-cols-1 md:grid-cols-[1fr_min-content] gap-y-2 lg:gap-x-0 md:gap-x-4"
 	>
 		<div class="grid grid-rows-[min-content_min-content_1fr] gap-y-2">
-			<label for="WrapperVisible" class="flex items-center space-x-2 select-none">
+			<label for="HeaderVisible" class="flex items-center space-x-2 select-none">
 				<input
 					class="checkbox disabled:variant-soft-primary text-gray-500"
 					type="checkbox"
-					name="wrapper_visible"
-					id="WrapperVisible"
+					id="HeaderVisible"
 					bind:checked={headerVisible}
 					disabled={hasCustomHeader}
 					on:change={changeHeaderVisible}
 				/>
-				<span>Display wrapper code</span>
+				<span>Display header code</span>
 			</label>
 			<button
-				class="btn btn-sm variant-soft-primary"
+				class="btn btn-sm variant-filled-primary"
 				on:click|preventDefault={execCode}
 				disabled={!canExecute}
 			>
