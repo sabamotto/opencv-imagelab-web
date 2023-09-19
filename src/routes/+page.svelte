@@ -4,6 +4,7 @@
 	import 'prismjs/themes/prism-okaidia.css';
 	import { onMount, tick } from 'svelte';
 	import type { ComponentType } from 'svelte';
+	import type { Pyodide, PyProxy } from '$lib/pyodide';
 
 	const scaleFactor = window.devicePixelRatio;
 
@@ -89,8 +90,9 @@ display(img)`;
 				});
 			}
 			await pyodide.runPythonAsync(code, { filename: '<main>', globals: ns });
-		} catch (e: any) {
-			await pushPyLog(2, e.message);
+		} catch (e: unknown) {
+			if (e instanceof Error) await pushPyLog(2, e.message);
+			else console.trace(e);
 		}
 		ns.destroy();
 	};
