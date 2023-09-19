@@ -207,9 +207,9 @@ display(img)`;
 				>
 					{#each pyLog as [type, record]}
 						<li
-							class="py-1 m-1 border-b-blue-600 border-b-[1px] last:border-b-0 logtype-{type} hover:bg-slate-800 whitespace-normal"
+							class="py-1 m-1 border-b-blue-600 border-b-[1px] last:border-b-0 logtype-{type} hover:bg-slate-800"
 						>
-							<pre>{record}</pre>
+							<pre class="inline whitespace-pre-wrap break-words">{record}</pre>
 						</li>
 					{/each}
 				</ul>
