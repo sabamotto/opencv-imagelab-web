@@ -37,7 +37,7 @@ cd opencv-imagelab-web
 3. Install dependencies. Please install [pnpm](https://pnpm.io/) in advance.
 
 ```bash
-pnpm ci
+pnpm i
 ```
 
 4. Start the application.
