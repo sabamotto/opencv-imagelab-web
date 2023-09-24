@@ -29,12 +29,11 @@ def display(img):
 async def imread_picsum(path, flags:int=1):
 	import cv2
 	import numpy as np
-	from pyodide.http import pyfetch
-	print("Download picsum image..")
-	res = await pyfetch(f"https://picsum.photos/{path}")
-	buf = bytearray(await res.bytes())
-	arr = np.asarray(buf, dtype=np.uint8)
-	return cv2.imdecode(arr, flags)
+	from cvlab import get_picsum
+	buf = await get_picsum(path)
+	if buf:
+		arr = np.asarray(buf, dtype=np.uint8)
+		return cv2.imdecode(arr, flags)
 
 # Your code here
 `;
@@ -45,10 +44,13 @@ import numpy as np
 img = await imread_picsum(256)
 # Or specified image from picsum.photos
 #img = await imread_picsum("id/20/256/256")
+h, w, depth = img.shape
+cx, cy = w // 2, h // 2
+print(f"1.Center pixel: {img[cy, cx]}")
 
 # Your image-effect
-img = cv2.medianBlur(img, 5)
-print(f"first pixel: {img[0, 0]}")
+img[:, cx:] = cv2.medianBlur(img[:, cx:], 9)
+print(f"2.Center pixel: {img[cy, cx]}")
 display(img)`;
 
 	let headerVisible = false;
@@ -106,6 +108,8 @@ display(img)`;
 	let scaleFactor = 1;
 	let canvasWidth: number = 256;
 	let canvasHeight: number = 256;
+	const picsumCache = new Map<string, Blob>();
+
 	let canExecute = false;
 	onMount(async () => {
 		scaleFactor = window.devicePixelRatio;
@@ -119,7 +123,11 @@ display(img)`;
 			stderr: (msg) => pushPyLog(2, msg)
 		});
 		pyodide.registerJsModule('cvlab', {
-			display_raw_image: (bytes: PyBuffer, width: number, height: number) => {
+			display_raw_image: async (bytes: PyBuffer, width: number, height: number) => {
+				scaleFactor = window.devicePixelRatio;
+				canvasWidth = width;
+				canvasHeight = height;
+				await tick();
 				const buffer = bytes.getBuffer('u8clamped');
 				bytes.destroy();
 				try {
@@ -127,10 +135,26 @@ display(img)`;
 					const ctx = mainCanvas.getContext('2d');
 					if (!ctx) throw new Error('Failed to create canvas context.');
 					ctx.putImageData(data, 0, 0);
-					scaleFactor = window.devicePixelRatio;
 				} finally {
 					buffer.release();
 				}
+			},
+			get_picsum: async (path: string, nocache: boolean = false) => {
+				let data: Blob;
+				if (!nocache && picsumCache.has(path)) {
+					data = picsumCache.get(path) as Blob;
+				} else {
+					await pushPyLog(0, 'Download an image..');
+					const res = await fetch(`https://picsum.photos/${path}`);
+					if (!res.ok) {
+						await pushPyLog(2, `Failed to download an image.\npath: ${path}`);
+						return null;
+					}
+					data = await res.blob();
+					picsumCache.set(path, data);
+				}
+				const buf = await data.arrayBuffer();
+				return new Uint8Array(buf);
 			}
 		});
 		pyLog[pyLog.length - 1][1] += 'OK';
